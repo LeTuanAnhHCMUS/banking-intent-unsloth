@@ -1,0 +1,4 @@
+text,label,label_text
+"my bank transfer completed but my balance has not updated",12,balance_not_updated_after_cheque_or_bank_transfer
+"why is this beneficiary not allowed for transfer",17,beneficiary_not_allowed
+"my transfer is pending for too long",54,pending_transfer

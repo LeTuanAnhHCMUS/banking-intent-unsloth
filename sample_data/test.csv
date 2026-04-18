@@ -1,0 +1,3 @@
+text,label,label_text
+"i cannot withdraw cash from an atm",14,cash_withdrawal
+"my card is not working for payments",27,card_not_working
