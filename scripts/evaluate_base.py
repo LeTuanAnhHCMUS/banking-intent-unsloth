@@ -127,7 +127,9 @@ Intent:
         )
 
         response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-
+        print("MODEL OUTPUT:")
+        print(response)
+        print("="*50)
         pred = response.split("Intent:")[-1].strip().split("\n")[0]
 
         # Clean prediction
