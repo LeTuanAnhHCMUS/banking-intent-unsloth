@@ -1,3 +1,3 @@
 text,label,label_text
-"cash withdrawal was charged twice",14,cash_withdrawal
-"i want to freeze my card now",27,card_not_working
+"i cannot withdraw cash from an atm",14,cash_withdrawal
+"my card is not working for payments",27,card_not_working
