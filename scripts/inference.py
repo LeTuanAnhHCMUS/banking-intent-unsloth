@@ -1,89 +1,170 @@
-import argparse
-import json
-import re
-from difflib import get_close_matches
-from pathlib import Path
-
-import torch
 import yaml
+import torch
+import re
 from unsloth import FastLanguageModel
 
+# Danh sách 77 intent cố định
+RAW_INTENT_LIST = """
+activate_my_card
+age_limit
+apple_pay_or_google_pay
+atm_support
+automatic_top_up
+balance_not_updated_after_bank_transfer
+balance_not_updated_after_cheque_or_cash_deposit
+beneficiary_not_allowed
+cancel_transfer
+card_about_to_expire
+card_acceptance
+card_arrival
+card_delivery_estimate
+card_linking
+card_not_working
+card_payment_fee_charged
+card_payment_not_recognised
+card_payment_wrong_exchange_rate
+card_swallowed
+cash_withdrawal_charge
+cash_withdrawal_not_recognised
+change_pin
+compromised_card
+contactless_not_working
+country_support
+declined_card_payment
+declined_cash_withdrawal
+declined_transfer
+direct_debit_payment_not_recognised
+disposable_card_limits
+edit_personal_details
+exchange_charge
+exchange_rate
+exchange_via_app
+extra_charge_on_statement
+failed_transfer
+fiat_currency_support
+get_disposable_virtual_card
+get_physical_card
+getting_spare_card
+getting_virtual_card
+lost_or_stolen_card
+lost_or_stolen_phone
+order_physical_card
+passcode_forgotten
+pending_card_payment
+pending_cash_withdrawal
+pending_top_up
+pending_transfer
+pin_blocked
+receiving_money
+Refund_not_showing_up
+request_refund
+reverted_card_payment
+supported_cards_and_currencies
+terminate_account
+top_up_by_bank_transfer_charge
+top_up_by_card_charge
+top_up_by_cash_or_cheque
+top_up_failed
+top_up_limits
+top_up_reverted
+topping_up_by_card
+transaction_charged_twice
+transfer_fee_charged
+transfer_into_account
+transfer_not_received_by_recipient
+transfer_timing
+unable_to_verify_identity
+verify_my_identity
+verify_source_of_funds
+verify_top_up
+virtual_card_not_working
+visa_or_mastercard
+why_verify_identity
+wrong_amount_of_cash_received
+wrong_exchange_rate_for_cash_withdrawal
+"""
+ALL_INTENTS = [label.strip().lower() for label in RAW_INTENT_LIST.strip().split("\n") if label.strip()]
 
-WHITESPACE_PATTERN = re.compile(r"\s+")
-
-
-def clean_text(text: str) -> str:
-    text = text.strip().lower()
-    return WHITESPACE_PATTERN.sub(" ", text)
-
-
-def build_prompt(message: str) -> str:
-    return (
-        "Classify the banking intent for the customer message.\n"
-        f"Message: {clean_text(message)}\n"
-        "Intent:"
-    )
-
+def extract_intent(pred_text, label_list):
+    pred_text = pred_text.lower().strip()
+    for label in label_list:
+        if label in pred_text:
+            return label
+    tokens = re.findall(r"[a-z_]+", pred_text)
+    for t in tokens:
+        if t in label_list:
+            return t
+    candidates = [t for t in tokens if "_" in t]
+    if candidates:
+        return max(candidates, key=len)
+    return pred_text
 
 class IntentClassification:
     def __init__(self, model_path):
-        self.model_path = Path(model_path)
+        # model_path ở đây là đường dẫn tới file YAML
+        with open(model_path, "r") as f:
+            config = yaml.safe_load(f)
+
+        # Đọc trực tiếp không cần truy cập lồng
+        checkpoint = config.get("model_path")
+        
         self.model, self.tokenizer = FastLanguageModel.from_pretrained(
-            model_name=str(self.model_path),
-            max_seq_length=1024,
-            dtype=None,
-            load_in_4bit=True,
+            model_name = checkpoint,
+            max_seq_length = 512,
+            load_in_4bit = config.get("load_in_4bit", True),
         )
         FastLanguageModel.for_inference(self.model)
-        self.model.eval()
-
-        mapping_file = self.model_path / "id2label.json"
-        self.labels = []
-        if mapping_file.exists():
-            with mapping_file.open("r", encoding="utf-8") as handle:
-                label_map = json.load(handle)
-            self.labels = [label_map[key] for key in sorted(label_map, key=int)]
+        
+        # Lưu các tham số để dùng khi gọi hàm __call__
+        self.params = config
 
     def __call__(self, message):
-        prompt = build_prompt(message)
-        encoded = self.tokenizer(prompt, return_tensors="pt")
-        encoded = {key: value.to(self.model.device) for key, value in encoded.items()}
+        # Format prompt PHẢI KHỚP VỚI LÚC TRAIN
+        prompt = f"""### Instruction:
+Classify the banking intent.
+
+### Input:
+{message}
+
+### Response:
+"""
+        inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
 
         with torch.no_grad():
             outputs = self.model.generate(
-                **encoded,
-                max_new_tokens=8,
+                **inputs,
+                max_new_tokens=15,
                 do_sample=False,
-                pad_token_id=self.tokenizer.eos_token_id,
+                temperature=0.0
             )
 
-        decoded = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        predicted = decoded.split("Intent:", maxsplit=1)[-1].strip().splitlines()[0].strip()
+        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        
+        if "Response:" in response:
+            pred_raw = response.split("Response:")[-1].strip()
+        else:
+            pred_raw = response.strip()
 
-        if self.labels and predicted not in self.labels:
-            matches = get_close_matches(predicted, self.labels, n=1, cutoff=0.0)
-            if matches:
-                predicted = matches[0]
+        # Trích xuất nhãn chuẩn
+        predicted_label = extract_intent(pred_raw, ALL_INTENTS)
 
-        return predicted
+        return predicted_label
 
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run intent inference with a fine-tuned checkpoint")
-    parser.add_argument("--config", default="configs/inference.yaml", help="Path to inference YAML config")
-    parser.add_argument("--message", required=True, help="Customer message to classify")
-    return parser.parse_args()
-
-
-def main() -> None:
-    args = parse_args()
-    with open(args.config, "r", encoding="utf-8") as handle:
-        config = yaml.safe_load(handle) or {}
-
-    model_path = config.get("model_path", "checkpoints/banking77_intent")
-    classifier = IntentClassification(model_path=model_path)
-    print(classifier(args.message))
-
-
+# =========================
+# SHORT USAGE EXAMPLE
+# Yêu cầu: "Provide a short usage example showing how the inference class is called"
+# =========================
 if __name__ == "__main__":
-    main()
+    # Đảm bảo bạn đã tạo file configs/inference.yaml có nội dung:
+    # checkpoint_path: "tên_thư_mục_chứa_model_của_bạn"
+    
+    config_file_path = "configs/inference.yaml"
+    
+    print("Loading model for inference...")
+    classifier = IntentClassification(model_path=config_file_path)
+    
+    test_message = "Hi, I lost my virtual card and I need a replacement."
+    print(f"\nMessage: {test_message}")
+    
+    predicted_intent = classifier(message=test_message)
+    print(f"Predicted Label: {predicted_intent}")
