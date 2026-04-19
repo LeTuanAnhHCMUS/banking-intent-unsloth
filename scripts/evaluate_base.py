@@ -1,10 +1,18 @@
 import pandas as pd
-from unsloth import FastLanguageModel
-from sklearn.metrics import accuracy_score
+import re
 import torch
+from sklearn.metrics import accuracy_score
+from unsloth import FastLanguageModel
 
+# =========================
+# CONFIG & LABELS
+# =========================
+# Trỏ trực tiếp đến model gốc trên HuggingFace
+MODEL_PATH = "unsloth/llama-3.2-3b-unsloth-bnb-4bit" 
+TEST_PATH = "sample_data/test.csv"
 
-INTENT_LIST = """
+# Danh sách 77 intent cố định
+RAW_INTENT_LIST = """
 activate_my_card
 age_limit
 apple_pay_or_google_pay
@@ -83,70 +91,111 @@ why_verify_identity
 wrong_amount_of_cash_received
 wrong_exchange_rate_for_cash_withdrawal
 """
+ALL_INTENTS = [label.strip().lower() for label in RAW_INTENT_LIST.strip().split("\n") if label.strip()]
 
+# Tạo chuỗi danh sách nhãn để chèn vào prompt cho Base Model
+LABELS_STRING_FOR_PROMPT = "\n".join([f"- {label}" for label in ALL_INTENTS])
+
+# =========================
+# HELPERS
+# =========================
+def normalize(text):
+    return str(text).lower().strip().replace(" ", "_").replace(".", "")
+
+def extract_intent(pred_text, label_list):
+    pred_text = pred_text.lower().strip()
+    
+    for label in label_list:
+        if label in pred_text:
+            return label
+            
+    tokens = re.findall(r"[a-z_]+", pred_text)
+    for t in tokens:
+        if t in label_list:
+            return t
+            
+    candidates = [t for t in tokens if "_" in t]
+    if candidates:
+        return max(candidates, key=len)
+        
+    return pred_text
+
+# PROMPT CHO BASE MODEL (Zero-shot)
+def build_base_prompt(text):
+    return f"""You are a strict banking intent classifier.
+
+Return EXACTLY ONE label from the list below.
+Do NOT add explanation or punctuation.
+
+Labels:
+{LABELS_STRING_FOR_PROMPT}
+
+Text:
+{text}
+
+Answer:
+"""
+
+# =========================
+# MAIN EXECUTION
+# =========================
 def main():
-
-    print("Loading model...")
-
+    print("Loading base model...")
     model, tokenizer = FastLanguageModel.from_pretrained(
-        "unsloth/llama-3.2-3b-unsloth-bnb-4bit",
+        model_name=MODEL_PATH,
         max_seq_length=512,
         load_in_4bit=True,
     )
-
     FastLanguageModel.for_inference(model)
 
     print("Loading test data...")
-    test_df = pd.read_csv("sample_data/test.csv")
+    test_df = pd.read_csv(TEST_PATH)
 
     predictions = []
     labels = []
 
-    print("Evaluating base model...")
+    print("\nEvaluating base model...\n")
 
     for i, row in test_df.iterrows():
+        prompt = build_base_prompt(row["text"])
+        inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
 
-        prompt = f"""
-You are a banking intent classifier.
+        with torch.no_grad():
+            outputs = model.generate(
+                **inputs,
+                max_new_tokens=15,
+                do_sample=False,
+                temperature=0.0
+            )
 
-Choose ONLY one intent from the list below.
+        response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-{INTENT_LIST}
+        # Lấy phần text sau "Answer:"
+        if "Answer:" in response:
+            pred_raw = response.split("Answer:")[-1].strip()
+        else:
+            pred_raw = response.strip()
+        
+        # Lọc nhãn an toàn
+        pred = extract_intent(pred_raw, ALL_INTENTS)
+        
+        pred = normalize(pred)
+        true = normalize(row["intent"])
 
-Text: {row['text']}
+        predictions.append(pred)
+        labels.append(true)
 
-Intent:
-"""
-
-    inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
-
-    outputs = model.generate(
-        **inputs,
-        max_new_tokens=10,
-        do_sample=False
-    )
-
-    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-    pred = response.split("Intent:")[-1].strip().split("\n")[0]
-
-    pred = normalize(pred)
-    true_label = normalize(row["intent"])
-
-    predictions.append(pred)
-    labels.append(true_label)
-
-    # Print mỗi test
-    print(f"Sample {i+1}")
-    print("Text :", row["text"])
-    print("True :", true_label)
-    print("Pred :", pred)
-    print("=" * 60)
-
+        correct = "✓" if pred == true else "✗"
+        print(f"Sample {i+1} [{correct}]")
+        print("Text :", row["text"])
+        print("True :", true)
+        print("Pred :", pred)
+        print("-" * 60)
 
     acc = accuracy_score(labels, predictions)
-
-    print("\nBase Model Accuracy:", acc)
+    print("\n============================")
+    print("Base Model Accuracy:", acc)
+    print("============================\n")
 
 if __name__ == "__main__":
     main()
