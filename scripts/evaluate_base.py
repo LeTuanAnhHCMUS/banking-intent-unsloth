@@ -104,7 +104,7 @@ def main():
 
     print("Evaluating base model...")
 
-    for _, row in test_df.iterrows():
+    for i, row in test_df.iterrows():
 
         prompt = f"""
 You are a banking intent classifier.
@@ -118,39 +118,35 @@ Text: {row['text']}
 Intent:
 """
 
-        inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
+    inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
 
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=10,
-            do_sample=False
-        )
+    outputs = model.generate(
+        **inputs,
+        max_new_tokens=10,
+        do_sample=False
+    )
 
-        response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        print("MODEL OUTPUT:")
-        print(response)
-        print("="*50)
-        pred = response.split("Intent:")[-1].strip().split("\n")[0]
+    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-        # Clean prediction
-        pred = pred.replace(".", "").strip()
+    pred = response.split("Intent:")[-1].strip().split("\n")[0]
 
-        predictions.append(pred)
-        labels.append(row["intent"])
+    pred = normalize(pred)
+    true_label = normalize(row["intent"])
+
+    predictions.append(pred)
+    labels.append(true_label)
+
+    # Print mỗi test
+    print(f"Sample {i+1}")
+    print("Text :", row["text"])
+    print("True :", true_label)
+    print("Pred :", pred)
+    print("=" * 60)
+
 
     acc = accuracy_score(labels, predictions)
 
     print("\nBase Model Accuracy:", acc)
-
-    # Print sample predictions
-    print("\nSample predictions:\n")
-
-    for i in range(5):
-        print("Text:", test_df.iloc[i]["text"])
-        print("True:", labels[i])
-        print("Pred:", predictions[i])
-        print("-" * 50)
-
 
 if __name__ == "__main__":
     main()
