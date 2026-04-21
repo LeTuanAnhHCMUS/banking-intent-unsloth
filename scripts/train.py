@@ -68,11 +68,9 @@ Classify the banking intent.
             output_dir=OUTPUT_DIR,
             per_device_train_batch_size=2,
             gradient_accumulation_steps=4,
-            num_train_epochs=5, # Tăng epoch để học kỹ hơn 77 nhãn
+            num_train_epochs=3, # Tăng epoch để học kỹ hơn 77 nhãn
             
-            learning_rate=2e-4, # Rate chuẩn cho Llama
-            lr_scheduler_type="cosine", # Giảm lr mượt mà về cuối
-            warmup_steps=50,
+            learning_rate=2e-4, lr_scheduler_type="cosine", warmup_steps=100, # Rate chuẩn cho Llama
             
             logging_steps=10,
             save_steps=400,
