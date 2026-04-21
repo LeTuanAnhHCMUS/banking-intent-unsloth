@@ -7,7 +7,7 @@ def main():
 
     print("Loading dataset...")
 
-    dataset = load_dataset("PolyAI/banking77")
+    dataset = load_dataset("PolyAI/banking77", trust_remote_code=True)
 
     train_data = dataset["train"]
     test_data = dataset["test"]
