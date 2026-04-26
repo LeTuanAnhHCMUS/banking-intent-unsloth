@@ -1,3 +1,4 @@
+# link kaggle notebook: https://www.kaggle.com/code/ltanh64/lab2nlpinindustry
 # banking-intent-unsloth
 
 Fine-tuning project for intent classification on the **BANKING77** dataset using **Unsloth**.
