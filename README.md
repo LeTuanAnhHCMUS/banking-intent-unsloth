@@ -1,5 +1,5 @@
 # Banking Intent Classification with Llama 3 & Unsloth
-<!-- <!-- # link kaggle notebook: https://www.kaggle.com/code/ltanh64/lab2nlpinindustry -->
+<!-- # link kaggle notebook: https://www.kaggle.com/code/ltanh64/lab2nlpinindustry -->
 
 Fine-tune **Llama 3** (QLoRA) cho bài toán phân loại 77 banking intents trên tập BANKING77.
 
