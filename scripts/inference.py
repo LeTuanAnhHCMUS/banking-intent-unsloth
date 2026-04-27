@@ -1,7 +1,8 @@
 import yaml
 import torch
 import re
-from unsloth import FastLanguageModel
+import warnings
+from transformers import AutoModelForCausalLM, AutoTokenizer, logging as hf_logging
 
 # Danh sách 77 intent cố định
 RAW_INTENT_LIST = """
@@ -101,34 +102,25 @@ def extract_intent(pred_text, label_list):
 
 class IntentClassification:
     def __init__(self, model_path):
-        # model_path ở đây là đường dẫn tới file YAML
-        with open(model_path, "r") as f:
+        # model_path là đường dẫn tới file YAML config
+        with open(model_path, "r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
-        # Đọc trực tiếp không cần truy cập lồng
         checkpoint = config.get("model_path")
-        
-        self.model, self.tokenizer = FastLanguageModel.from_pretrained(
-            model_name = checkpoint,
-            max_seq_length = 512,
-            load_in_4bit = config.get("load_in_4bit", True),
-        )
-        FastLanguageModel.for_inference(self.model)
-        
-        # Lưu các tham số để dùng khi gọi hàm __call__
+        if not checkpoint:
+            raise ValueError("Config file must contain 'model_path' key pointing to your model checkpoint directory.")
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        self.tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+        self.model = AutoModelForCausalLM.from_pretrained(checkpoint)
+        self.model.to(self.device)
         self.params = config
 
     def __call__(self, message):
         # Format prompt PHẢI KHỚP VỚI LÚC TRAIN
-        prompt = f"""### Instruction:
-Classify the banking intent.
-
-### Input:
-{message}
-
-### Response:
-"""
-        inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
+        prompt = f"""### Instruction:\nClassify the banking intent.\n\n### Input:\n{message}\n\n### Response:\n"""
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
 
         with torch.no_grad():
             outputs = self.model.generate(
@@ -139,7 +131,7 @@ Classify the banking intent.
             )
 
         response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        
+
         if "Response:" in response:
             pred_raw = response.split("Response:")[-1].strip()
         else:
@@ -152,19 +144,23 @@ Classify the banking intent.
 
 # =========================
 # SHORT USAGE EXAMPLE
-# Yêu cầu: "Provide a short usage example showing how the inference class is called"
 # =========================
 if __name__ == "__main__":
-    # Đảm bảo bạn đã tạo file configs/inference.yaml có nội dung:
-    # checkpoint_path: "tên_thư_mục_chứa_model_của_bạn"
-    
-    config_file_path = "configs/inference.yaml"
-    
+    # Suppress transformers warnings for clean output
+    warnings.filterwarnings("ignore")
+    hf_logging.set_verbosity_error()
+
+    # Đảm bảo bạn đã tạo file configs/inference.yaml với nội dung:
+    # model_path: "tên_thư_mục_chứa_model_của_bạn"
+
+    config_file_path = "../configs/inference.yaml"
+
     print("Loading model for inference...")
     classifier = IntentClassification(model_path=config_file_path)
-    
-    test_message = "Hi, I lost my virtual card and I need a replacement."
-    print(f"\nMessage: {test_message}")
-    
+
+    test_message = "I lost my virtual card and I need a replacement." # Bạn có thể thay đổi câu này để thử nghiệm với các intent khác nhau
+    print("\n==============================")
+    print(f"Input Message : {test_message}")
     predicted_intent = classifier(message=test_message)
-    print(f"Predicted Label: {predicted_intent}")
+    print(f"Predicted Intent: {predicted_intent}")
+    print("==============================\n")

@@ -1,8 +1,8 @@
 # Đường dẫn tới thư mục model đã train xong
-model_path: "outputs/banking_intent_model"
+model_path: "../outputs/banking_intent_model"
 
 # Cấu hình sinh text (giữ cố định cho bài toán phân loại)
-max_new_tokens: 15
+max_new_tokens: 512
 temperature: 0.0
 do_sample: false
 

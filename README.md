@@ -1,97 +1,179 @@
-# link kaggle notebook: https://www.kaggle.com/code/ltanh64/lab2nlpinindustry
-# banking-intent-unsloth
+# Banking Intent Classification with Llama 3 & Unsloth
+<!-- <!-- # link kaggle notebook: https://www.kaggle.com/code/ltanh64/lab2nlpinindustry -->
 
-Fine-tuning project for intent classification on the **BANKING77** dataset using **Unsloth**.
+Fine-tune **Llama 3** (QLoRA) cho bài toán phân loại 77 banking intents trên tập BANKING77.
 
-## Project structure
+---
 
-```text
+## Table of Contents
+
+- [Project Structure](#project-structure)
+- [Environment Setup](#environment-setup)
+- [Training Configuration](#training-configuration)
+- [Training](#training)
+- [Inference](#inference)
+- [Evaluation](#evaluation)
+- [Dataset](#dataset)
+- [Troubleshooting](#troubleshooting)
+
+---
+
+## Project Structure
+
+```
 banking-intent-unsloth/
 ├── scripts/
-│   ├── train.py
-│   ├── inference.py
-│   └── preprocess_data.py
+│   ├── train.py                # Fine-tune script (Unsloth QLoRA)
+│   ├── inference.py            # Unified inference (class + CLI)
+|   ├── evaluate_base.py        # Accuracy evaluation based model
+│   ├── evaluate_finetuned.py   # Accuracy evaluation finetuned model
+│   └── preprocess_data.py      # Download & preprocess Banking77
 ├── configs/
-│   ├── train.yaml
-│   └── inference.yaml
-├── sample_data/
+│   ├── train.yaml              # Training config (model, LoRA, hyperparams)
+│   └── inference.yaml          # Inference config (generation, paths)
+├── sample_data/                # Dữ liệu sau khi chạy preprocess
 │   ├── train.csv
+│   ├── val.csv
 │   └── test.csv
+├── outputs/
+│   └── banking_intent_model/   # Model sau khi train
+│       ├── adapter_config.json
+│       ├── adapter_model.safetensors
+│       └── tokenizer files
 ├── requirements.txt
-├── train.sh
-├── inference.sh
 └── README.md
 ```
 
-## Setup
+---
+
+## Environment Setup
+
+### Installation
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
+# 1. Clone repository
+!git clone <repo_url>
+%cd banking-intent-unsloth
+
+# 2. Install dependencies
+!pip install -r requirements.txt
 ```
 
-> For Google Colab/Kaggle, run `pip install -r requirements.txt` in a notebook cell and then execute scripts with `!python ...`.
+## Training Configuration
 
-## Data preprocessing
+### Model Configuration (`configs/train.yaml`)
 
-Generate cleaned train/test CSV files from BANKING77:
-
-```bash
-python scripts/preprocess_data.py --output-dir sample_data --sample-size 5000
+```yaml
+model:
+  name: "unsloth/llama-3.2-3b-unsloth-bnb-4bit"
+  max_seq_length: 512
+  load_in_4bit: true
+lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+training:
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 4
+  num_train_epochs: 3
+  learning_rate: 2e-4
+  lr_scheduler_type: "cosine"
+  warmup_steps: 100
+  logging_steps: 10
+  save_steps: 400
+  eval_strategy: "steps"
+  eval_steps: 200
+  optim: "adamw_8bit"
+  weight_decay: 0.01
+  fp16: true
+  report_to: "none"
+output_dir: "outputs/banking_intent_model"
 ```
 
-This script:
-- Loads BANKING77 from HuggingFace datasets
-- Cleans text
-- Maps label IDs to label names
-- Splits into train/test
-- Saves CSV files to `sample_data/`
+---
 
 ## Training
 
-Update hyperparameters in `configs/train.yaml`, then run:
-
 ```bash
-./train.sh
+# 1. Preprocess data
+python scripts/preprocess_data.py
+
+# 2. Train model
+python scripts/train.py
 ```
 
-or:
+- Tập dữ liệu sẽ được tải về, làm sạch và lưu vào sample_data/.
+- Model checkpoint sẽ được lưu vào outputs/banking_intent_model/.
 
-```bash
-python scripts/train.py --config configs/train.yaml
-```
-
-Training flow:
-- Loads BANKING77 from HuggingFace datasets
-- Samples a subset of data
-- Preprocesses message text
-- Fine-tunes with Unsloth + LoRA
-- Saves checkpoint to `checkpoints/banking77_intent`
+---
 
 ## Inference
 
-Set checkpoint path in `configs/inference.yaml`, then run:
-
-```bash
-./inference.sh "my debit card payment is missing"
-```
-
-Python usage:
+### Python API
 
 ```python
 from scripts.inference import IntentClassification
 
-classifier = IntentClassification("checkpoints/banking77_intent")
-print(classifier("where is my bank transfer"))
+classifier = IntentClassification("configs/inference.yaml")
+label = classifier("I lost my virtual card and I need a replacement.")
+print(label)  # → transfer_into_account
 ```
+
+### CLI
+
+```bash
+python scripts/inference.py
+```
+
+---
 
 ## Evaluation
 
-A simple evaluation workflow:
-1. Use `sample_data/test.csv` or regenerated test data from preprocessing.
-2. Run model predictions for each test message.
-3. Compare predicted intent vs `label_text` to compute metrics (accuracy/F1) with `scikit-learn`.
+```bash
+python scripts/evaluate_finetuned.py
+```
 
-For quick experimentation in Colab/Kaggle, keep `subset_size` small in `configs/train.yaml` to reduce training time.
+- Script sẽ chạy dự đoán trên sample_data/test.csv và in ra độ chính xác.
+
+---
+
+## Dataset
+
+- **Banking77** từ `PolyAI/banking77` trên HuggingFace
+- 77 intent classes
+- ~13000 samples (10003 train samples and 3080 test samples)
+- Tự động download khi chạy preprocess_data.py
+
+---
+
+## Troubleshooting
+
+- Nếu lỗi thiếu thư viện: `pip install -r requirements.txt`
+- Nếu lỗi CUDA: kiểm tra GPU, RAM, CUDA version
+- Nếu lỗi FileNotFound: kiểm tra lại đường dẫn model, data, config
+- Nếu lỗi encoding YAML: lưu file yaml với encoding UTF-8 hoặc đọc file yaml với encoding UTF-8 
+
+---
+
+## Requirements
+
+```
+unsloth
+transformers
+datasets
+accelerate
+peft
+trl
+torch
+pandas
+scikit-learn
+pyyaml
+```
