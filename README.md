@@ -23,7 +23,7 @@ Fine-tune **Llama 3** (QLoRA) cho bài toán phân loại 77 banking intents tr�
 ```
 banking-intent-unsloth/
 ├── scripts/
-│   ├── train.py                # Fine-tune script (Unsloth QLoRA)
+│   ├── train.py                # Fine-tune script (Unsloth QLoRA, Trainable parameters = 24,313,856 of 3,237,063,680 (0.75% trained)
 │   ├── inference.py            # Unified inference (class + CLI)
 |   ├── evaluate_base.py        # Accuracy evaluation based model
 │   ├── evaluate_finetuned.py   # Accuracy evaluation finetuned model
