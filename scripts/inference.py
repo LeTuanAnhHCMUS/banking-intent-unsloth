@@ -158,7 +158,12 @@ if __name__ == "__main__":
     print("Loading model for inference...")
     classifier = IntentClassification(model_path=config_file_path)
 
-    test_message = "I lost my virtual card and I need a replacement." # Bạn có thể thay đổi câu này để thử nghiệm với các intent khác nhau
+    # Cho phép người dùng nhập câu test_message từ bàn phím
+    try:
+        test_message = input("\n Enter intent message: ")
+    except EOFError:
+        test_message = "I lost my virtual card and I need a replacement."
+
     print("\n==============================")
     print(f"Input Message : {test_message}")
     predicted_intent = classifier(message=test_message)

@@ -1,4 +1,5 @@
 # Banking Intent Classification with Llama 3 & Unsloth
+Link Drive folder: https://drive.google.com/drive/folders/1eekuX65RQze23xVkZIe-P_1i16_euzhg?usp=sharing
 Link Kaggle notebook: https://www.kaggle.com/code/ltanh64/lab2nlpinindustry
 Link download model: https://huggingface.co/Tuan-Anh-64/banking-intent-llama3
 
