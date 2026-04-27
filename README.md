@@ -1,7 +1,7 @@
 # Banking Intent Classification with Llama 3 & Unsloth
-Link Drive folder: https://drive.google.com/drive/folders/1eekuX65RQze23xVkZIe-P_1i16_euzhg?usp=sharing
-Link Kaggle notebook: https://www.kaggle.com/code/ltanh64/lab2nlpinindustry
-Link download model: https://huggingface.co/Tuan-Anh-64/banking-intent-llama3
+Link Drive folder: https://drive.google.com/drive/folders/1eekuX65RQze23xVkZIe-P_1i16_euzhg?usp=sharing  
+Link Kaggle notebook: https://www.kaggle.com/code/ltanh64/lab2nlpinindustry  
+Link download model: https://huggingface.co/Tuan-Anh-64/banking-intent-llama3  
 
 Fine-tune **Llama 3** (QLoRA) cho bài toán phân loại 77 banking intents trên tập BANKING77.
 
@@ -25,7 +25,7 @@ Fine-tune **Llama 3** (QLoRA) cho bài toán phân loại 77 banking intents tr�
 ```
 banking-intent-unsloth/
 ├── scripts/
-│   ├── train.py                # Fine-tune script (Unsloth QLoRA, Trainable parameters = 24,313,856 of 3,237,063,680 (0.75% trained)
+│   ├── train.py                # Fine-tune script (Unsloth QLoRA, Trainable parameters = 24,313,856 of 3,237,063,680 (0.75% trained))
 │   ├── inference.py            # Unified inference (class + CLI)
 |   ├── evaluate_base.py        # Accuracy evaluation based model
 │   ├── evaluate_finetuned.py   # Accuracy evaluation finetuned model
