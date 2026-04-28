@@ -63,6 +63,7 @@ banking-intent-unsloth/
 
 ## Training Configuration
 
+
 ### Model Configuration (`configs/train.yaml`)
 
 ```yaml
@@ -98,7 +99,13 @@ training:
   fp16: true
   report_to: "none"
 output_dir: "outputs/banking_intent_model"
+
 ```
+
+**Dataset split:**
+- Số lượng mẫu dùng để train: **9000**
+- Số lượng mẫu dùng để validate: **1000**
+- Số lượng mẫu dùng để test: **1000**
 
 ---
 
@@ -149,11 +156,15 @@ python scripts/evaluate_finetuned.py
 
 ## Dataset
 
+...existing code...
 - **Banking77** từ `PolyAI/banking77` trên HuggingFace
 - 77 intent classes
 - ~13000 samples (10003 train samples and 3080 test samples)
 - Tự động download khi chạy preprocess_data.py
 
+**Lưu ý:**
+- Bài này lấy **10000 mẫu** từ tập train gốc, chia thành **9000 mẫu để train** và **1000 mẫu để validate**.
+- Lấy **1000 mẫu** từ tập test để đánh giá mô hình.
 ---
 
 ## Troubleshooting
