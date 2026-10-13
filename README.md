@@ -156,7 +156,6 @@ python scripts/evaluate_finetuned.py
 
 ## Dataset
 
-...existing code...
 - **Banking77** từ `PolyAI/banking77` trên HuggingFace
 - 77 intent classes
 - ~13000 samples (10003 train samples and 3080 test samples)
