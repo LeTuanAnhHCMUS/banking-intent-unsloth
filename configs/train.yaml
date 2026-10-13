@@ -1,4 +1,4 @@
-model_name: unsloth/llama-3.1-8b-unsloth-bnb-4bit
+model_name: unsloth/llama-3.2-8b-unsloth-bnb-4bit
 
 batch_size: 2
 gradient_accumulation_steps: 4
